@@ -1,0 +1,107 @@
+# Builds the release APK on every push to main, and on demand.
+#
+# Repository secrets this workflow needs:
+#   KEYSTORE_BASE64     base64 of the release .jks
+#   KEYSTORE_PASSWORD   the keystore password
+#   KEY_ALIAS           pressure-report
+#   KEY_PASSWORD        the key password
+#   TELEGRAM_TO         chat id that receives the APK
+#   TELEGRAM_TOKEN      bot token
+#
+# The key never enters the repository: it is decoded into $RUNNER_TEMP and
+# android/keystore.properties (gitignored) points Gradle at it for one run.
+
+name: Android APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # Gradle 8.2.1 supports Java up to 20, so 17 is the newest it accepts.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+          cache: gradle
+
+      # Pinned to the version the suite was written against: a newer Bun can
+      # change timings and node:sqlite behaviour without a commit of ours.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.4
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Check
+        run: |
+          bun run check
+
+      - name: Write the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          printf 'storeFile=%s\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
+            "$RUNNER_TEMP/release.jks" "$KEYSTORE_PASSWORD" "$KEY_ALIAS" "$KEY_PASSWORD" \
+            > android/keystore.properties
+
+      - name: Build the signed APK
+        run: |
+          bun run cap:sync
+          cd android
+          ./gradlew assembleRelease --no-daemon
+
+      # Without this a missing key would leave an unsigned APK behind and every
+      # later step would still pass.
+      - name: Verify the signature
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          BUILD_TOOLS=$(ls "$ANDROID_HOME/build-tools" | sort -V | tail -n 1)
+          "$ANDROID_HOME/build-tools/$BUILD_TOOLS/apksigner" verify --print-certs "$APK"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: pressure-report-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      # A failed notification must not fail a build that already produced an APK.
+      - name: Send the APK to Telegram
+        if: success()
+        continue-on-error: true
+        uses: appleboy/telegram-action@v1.1.1
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          document: android/app/build/outputs/apk/release/app-release.apk
+          message: |
+            🚀 Android APK Sukses Dibuat!
+
+            📌 Repository: ${{ github.repository }}
+            🌿 Branch: `${{ github.ref_name }}`
+            👤 Actor: ${{ github.actor }}
+            📝 Commit: ${{ github.event.head_commit.message || github.sha }}

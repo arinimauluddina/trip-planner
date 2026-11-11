@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Vite build output
+dist/
+
+# Environment files and local secrets
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+
+# Android/Gradle generated files
+android/.gradle/
+android/**/build/
+android/local.properties
+android/keystore.properties
+
+# IDE and OS files
+.idea/
+*.iml
+.DS_Store

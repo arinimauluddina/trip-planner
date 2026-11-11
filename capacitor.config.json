@@ -1,0 +1,19 @@
+{
+  "appId": "com.tripplan.app",
+  "appName": "Trip Plan",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorSQLite": {
+      "iosDatabaseLocation": "Library/CapacitorDatabase",
+      "iosIsEncryption": false,
+      "androidIsEncryption": false,
+      "electronWindowsLocation": "C:\\ProgramData\\CapacitorDatabases",
+      "electronMacLocation": "/Volumes/Development_Launchpad/DAta/ElectronCapacitorDatabases",
+      "electronLinuxLocation": "Databases"
+    }
+  }
+}
+
