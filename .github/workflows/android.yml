@@ -1,16 +1,3 @@
-# Builds the release APK on every push to main, and on demand.
-#
-# Repository secrets this workflow needs:
-#   KEYSTORE_BASE64     base64 of the release .jks
-#   KEYSTORE_PASSWORD   the keystore password
-#   KEY_ALIAS           pressure-report
-#   KEY_PASSWORD        the key password
-#   TELEGRAM_TO         chat id that receives the APK
-#   TELEGRAM_TOKEN      bot token
-#
-# The key never enters the repository: it is decoded into $RUNNER_TEMP and
-# android/keystore.properties (gitignored) points Gradle at it for one run.
-
 name: Android APK
 
 on:
@@ -83,7 +70,7 @@ jobs:
 
       - uses: actions/upload-artifact@v7
         with:
-          name: pressure-report-apk
+          name: trip-planner
           path: android/app/build/outputs/apk/release/app-release.apk
           retention-days: 14
           if-no-files-found: error
