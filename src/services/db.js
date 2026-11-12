@@ -213,6 +213,9 @@ export async function getTrips() {
         destinations: (store.destinations || [])
           .filter(destination => destination.trip_id === trip.id)
           .sort((a, b) => a.sort_order - b.sort_order),
+        planning: (store.planning || [])
+          .filter(item => item.trip_id === trip.id)
+          .sort((a, b) => a.sort_order - b.sort_order),
       }))
   }
   const { CapacitorSQLite } = _db
@@ -229,15 +232,26 @@ export async function getTrips() {
     statement: 'SELECT * FROM destinations ORDER BY sort_order',
     values: [],
   })
+  const planningRes = await CapacitorSQLite.query({
+    database: DB_NAME,
+    statement: 'SELECT * FROM planning_items ORDER BY sort_order',
+    values: [],
+  })
   const destinationsByTrip = (destinationsRes.values || []).reduce((groups, destination) => {
     if (!groups[destination.trip_id]) groups[destination.trip_id] = []
     groups[destination.trip_id].push(destination)
+    return groups
+  }, {})
+  const planningByTrip = (planningRes.values || []).reduce((groups, item) => {
+    if (!groups[item.trip_id]) groups[item.trip_id] = []
+    groups[item.trip_id].push(item)
     return groups
   }, {})
 
   return trips.map(trip => ({
     ...trip,
     destinations: destinationsByTrip[trip.id] || [],
+    planning: planningByTrip[trip.id] || [],
   }))
 }
 

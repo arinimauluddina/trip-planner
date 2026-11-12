@@ -126,9 +126,21 @@ function handleTouchEnd(event) {
   }
 }
 
-const totalCost = computed(() =>
-  (props.trip.destinations || []).reduce((s, d) => s + (Number(d.cost) || 0), 0)
-)
+const totalCost = computed(() => {
+  const destinations = props.trip.destinations || []
+  const destinationCost = destinations.reduce((sum, destination) => sum + (Number(destination.cost) || 0), 0)
+
+  if (!['planned', 'planning'].includes(props.trip.status)) return destinationCost
+
+  const addedPlanningIds = new Set(
+    destinations.map(destination => destination.planning_id).filter(Boolean),
+  )
+  const planningCost = (props.trip.planning || [])
+    .filter(item => item.status !== 'added' && !addedPlanningIds.has(item.id))
+    .reduce((sum, item) => sum + (Number(item.cost) || 0), 0)
+
+  return destinationCost + planningCost
+})
 const destCount = computed(() => (props.trip.destinations || []).length)
 const colorBg = computed(() => {
   return TRIP_COLORS.find(c => c.value === props.trip.color)?.bg || '#B45A6D'
